@@ -25,7 +25,7 @@ function postgresConnectionOptions() {
     process.env.NODE_ENV === "test" && process.env.TEST_DATABASE_URL
       ? process.env.TEST_DATABASE_URL
       : process.env.DATABASE_URL
-  if (!configuredUrl) return { connectionString: configuredUrl }
+  if (!configuredUrl) return undefined
 
   const url = new URL(configuredUrl)
   const sslMode = url.searchParams.get("sslmode")
@@ -43,11 +43,17 @@ function postgresConnectionOptions() {
   const ca = loadDatabaseCertificateAuthority()
   const isProductionBuild =
     process.env.NEXT_PHASE === "phase-production-build"
-  if (process.env.NODE_ENV === "production" && !isProductionBuild && !ca)
-    throw new Error("Production database TLS requires a CA certificate")
   const allowUnverified =
-    process.env.NODE_ENV !== "production" &&
     process.env.DATABASE_SSL_ALLOW_UNVERIFIED === "true"
+
+  if (
+    process.env.NODE_ENV === "production" &&
+    !isProductionBuild &&
+    !ca &&
+    !allowUnverified
+  ) {
+    throw new Error("Production database TLS requires a CA certificate")
+  }
 
   return {
     connectionString: url.toString(),
@@ -58,10 +64,11 @@ function postgresConnectionOptions() {
   }
 }
 
-const pool =
-  globalForPool.pgPool ??
-  new Pool({
-    ...postgresConnectionOptions(),
+function createPool(): Pool | undefined {
+  const connectionOptions = postgresConnectionOptions()
+  if (!connectionOptions) return undefined
+  return new Pool({
+    ...connectionOptions,
     max: integerSetting("DATABASE_POOL_MAX", 5, 50),
     connectionTimeoutMillis: integerSetting(
       "DATABASE_CONNECT_TIMEOUT_MS",
@@ -86,12 +93,28 @@ const pool =
     ),
     application_name: "web-karaoke",
   })
+}
 
-const adapter = new PrismaPg(pool)
+let _pool: Pool | undefined | null = null
+function getPool(): Pool {
+  if (_pool !== null) return _pool!
+  const pool = globalForPool.pgPool ?? createPool()
+  if (!pool) {
+    throw new Error(
+      "DATABASE_URL is not configured. Database operations are unavailable."
+    )
+  }
+  _pool = pool
+  if (process.env.NODE_ENV !== "production") {
+    globalForPool.pgPool = pool
+  }
+  return pool
+}
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+function createPrismaClient(): PrismaClient {
+  const pool = getPool()
+  const adapter = new PrismaPg(pool)
+  return new PrismaClient({
     adapter,
     transactionOptions: {
       maxWait: integerSetting(
@@ -106,10 +129,19 @@ export const prisma =
       ),
     },
   })
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma
-  globalForPool.pgPool = pool
 }
+
+let _prisma: PrismaClient | undefined | null = null
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    if (_prisma === null) {
+      _prisma = globalForPrisma.prisma ?? createPrismaClient()
+      if (process.env.NODE_ENV !== "production") {
+        globalForPrisma.prisma = _prisma
+      }
+    }
+    return Reflect.get(_prisma!, prop)
+  },
+})
 
 export default prisma
