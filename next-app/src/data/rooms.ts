@@ -1,3 +1,6 @@
+/**
+ * @deprecated Chỉ dùng cho seed/fixture. Trang public phải dùng getCatalogRooms() từ catalog-service.
+ */
 import type { Room } from "@/types";
 
 export const rooms: Room[] = [

@@ -1,3 +1,6 @@
+/**
+ * @deprecated Chỉ dùng cho seed/fixture. Trang public phải dùng getCatalogMenuItems() từ catalog-service.
+ */
 import type { MenuItem } from "@/types";
 
 export const menuItems: MenuItem[] = [

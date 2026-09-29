@@ -1,3 +1,6 @@
+/**
+ * @deprecated Chỉ dùng cho seed/fixture. Trang public phải dùng getCatalogBranches() từ catalog-service.
+ */
 import type { Branch } from "@/types";
 import { siteConfig } from "@/config/site";
 

@@ -1,3 +1,6 @@
+/**
+ * @deprecated Chỉ dùng cho seed/fixture. Trang public phải dùng dữ liệu từ DB.
+ */
 export type Promotion = {
   id: string
   name: string
