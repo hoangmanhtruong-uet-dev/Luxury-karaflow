@@ -17,6 +17,7 @@
     "job:create-reminders": "tsx scripts/run-job.ts create-reminders",
     "test:integration": "tsx scripts/run-integration-tests.ts",
     "verify:production-env": "tsx scripts/verify-production-env.ts",
+    "validate:production-content": "tsx scripts/validate-production-content.ts",
     "load:local:sample": "node tests/load/local-sample.mjs",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
