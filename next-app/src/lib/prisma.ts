@@ -20,7 +20,7 @@ function integerSetting(name: string, fallback: number, maximum: number) {
   return value
 }
 
-function postgresConnectionOptions() {
+export function postgresConnectionOptions() {
   const configuredUrl =
     process.env.NODE_ENV === "test" && process.env.TEST_DATABASE_URL
       ? process.env.TEST_DATABASE_URL
@@ -43,22 +43,15 @@ function postgresConnectionOptions() {
   const ca = loadDatabaseCertificateAuthority()
   const isProductionBuild =
     process.env.NEXT_PHASE === "phase-production-build"
-  const allowUnverified =
-    process.env.DATABASE_SSL_ALLOW_UNVERIFIED === "true"
 
-  if (
-    process.env.NODE_ENV === "production" &&
-    !isProductionBuild &&
-    !ca &&
-    !allowUnverified
-  ) {
+  if (process.env.NODE_ENV === "production" && !isProductionBuild && !ca) {
     throw new Error("Production database TLS requires a CA certificate")
   }
 
   return {
     connectionString: url.toString(),
     ssl: {
-      rejectUnauthorized: !allowUnverified,
+      rejectUnauthorized: true,
       ...(ca ? { ca } : {}),
     },
   }

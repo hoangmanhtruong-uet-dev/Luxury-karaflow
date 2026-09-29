@@ -1,0 +1,51 @@
+name: Production Env Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  verify-production-env:
+    name: Verify Production Environment
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm --prefix next-app ci
+
+      - name: Verify production environment
+        env:
+          NODE_ENV: production
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_SSL_CA_BASE64: ${{ secrets.DATABASE_SSL_CA_BASE64 }}
+          DATABASE_SSL_CA_PEM: ${{ secrets.DATABASE_SSL_CA_PEM }}
+          DATABASE_SSL_CA_FILE: ${{ secrets.DATABASE_SSL_CA_FILE }}
+          DATABASE_SSL_ALLOW_UNVERIFIED: ${{ secrets.DATABASE_SSL_ALLOW_UNVERIFIED }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          SECURITY_EVENT_HASH_SECRET: ${{ secrets.SECURITY_EVENT_HASH_SECRET }}
+          RECOVERY_CODE_HASH_SECRET: ${{ secrets.RECOVERY_CODE_HASH_SECRET }}
+          TOTP_ENCRYPTION_KEY: ${{ secrets.TOTP_ENCRYPTION_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          PRODUCTION_CANONICAL_ORIGIN: ${{ secrets.PRODUCTION_CANONICAL_ORIGIN }}
+          AUTH_URL: ${{ secrets.AUTH_URL }}
+          AUTH_TRUST_HOST: ${{ secrets.AUTH_TRUST_HOST }}
+          TRUSTED_PROXY_MODE: ${{ secrets.TRUSTED_PROXY_MODE }}
+          PRODUCTION_EXPECTED_PROXY_MODE: ${{ secrets.PRODUCTION_EXPECTED_PROXY_MODE }}
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+          NEXT_PUBLIC_HOTLINE: ${{ secrets.NEXT_PUBLIC_HOTLINE }}
+          EMAIL_PROVIDER: ${{ secrets.EMAIL_PROVIDER }}
+        run: npm --prefix next-app run verify:production-env
+
+      - name: Fail if verification failed
+        if: failure()
+        run: |
+          echo "::error::Production environment verification FAILED. Fix secrets before deploying."
+          exit 1
