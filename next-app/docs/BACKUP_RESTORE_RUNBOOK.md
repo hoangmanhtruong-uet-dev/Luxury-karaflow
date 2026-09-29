@@ -1,46 +1,122 @@
-# Aiven PostgreSQL backup and restore runbook
+# Backup / Restore / Rollback Runbook
 
-Status: **BLOCKED / UNPROVEN**. A plan name, backup retention, latest successful backup, PITR window, restore target, RPO/RTO and rehearsal evidence are not available in this workspace. Provider marketing is not evidence.
+## Backup
 
-## Evidence to collect (redacted)
+### Automated Backups (Aiven)
 
-1. Aiven project/service identifiers and plan; PostgreSQL version; region; HA configuration.
-2. `max_connections`, reserved/admin connections, current/peak active/idle/waiting sessions.
-3. Backup schedule/retention, latest successful backup timestamp/ID/status, encryption and failure-alert destination.
-4. PITR/fork availability and earliest/latest restorable timestamps.
-5. Named database/service owner, Render owner and incident commander.
-6. Approved RPO/RTO. Until measured, both are `UNKNOWN`, not zero.
+| Item | Status | Evidence |
+|------|--------|----------|
+| Daily automated backup | ⬜ Cần xác nhận từ Aiven console | Chưa có bằng chứng |
+| Backup retention (days) | ⬜ Cần xác nhận | Chưa có bằng chứng |
+| PITR (Point-in-Time Recovery) | ⬜ Cần xác nhận | Chưa có bằng chứng |
+| Backup encryption | ⬜ Cần xác nhận | Chưa có bằng chứng |
+| Backup access control | ⬜ Cần xác nhận | Chưa có bằng chứng |
 
-## Safe restore rehearsal
+### Manual Backup Procedure
 
-1. Obtain incident/change approval and select a named backup or PITR timestamp. Never overwrite production.
-2. Create an isolated restored Aiven service/database with no public application traffic and distinct credentials.
-3. Create a least-privilege rehearsal runtime role; keep owner/migration credentials separate.
-4. Set `TEST_DATABASE_URL` only in the isolated operator shell. The database name must contain `test` or `ci` so integration tests fail closed.
-5. Verify migration history, required `btree_gist` extension, row counts by critical table, orphan checks, unique idempotency keys, room overlap constraint, contact/booking/outbox relationships and a sample of business records.
-6. Run `npm run test:integration` against the restored target. Do not run mutation tests against production.
-7. Measure start time, database ready time, integrity-complete time and application-ready time. Compare observed data cutoff with approved RPO and total recovery with RTO.
-8. Destroy the isolated restore through the provider's approved workflow after evidence retention; record deletion ID/time. Do not place credentials or dumps in Git.
+```bash
+# 1. Create database dump
+pg_dump $DATABASE_URL --format=custom --file=backup_$(date +%Y%m%d_%H%M%S).dump
 
-## Application cutover during a real recovery
+# 2. Upload to secure storage (example: S3)
+aws s3 cp backup_*.dump s3://your-backup-bucket/karaoke/
 
-1. Put writes into a pre-tested maintenance mode/edge rule and capture the old Render deploy/config IDs.
-2. Validate restored DB privately with the production runtime role and verified CA.
-3. Update Render `DATABASE_URL` and CA secret through secret management, deploy one controlled instance, and require ready=200.
-4. Smoke public reads and one explicitly approved synthetic mutation; verify idempotency, audit and outbox.
-5. Reopen traffic gradually while watching 5xx, latency, pool connections, duplicate/lost writes and dead letters.
-6. Keep the old database read-only/isolated according to retention policy; do not delete it during incident pressure.
+# 3. Verify dump integrity
+pg_restore --list backup_*.dump > /dev/null && echo "Backup valid"
+```
 
-## Integrity queries/checks
+## Restore
 
-- Duplicate non-null `Booking.idempotencyKey` or `ContactRequest.idempotencyKey`: must be zero (unique indexes should enforce this).
-- Overlapping occupying bookings for one room/time: must be zero and exclusion constraint present/validated.
-- Outbox aggregate IDs with no booking/contact, and notification deliveries with no outbox: must be zero except documented retention behavior.
-- `_prisma_migrations`: no failed/unrolled migration; required migrations finished.
-- Compare critical table counts and timestamp maxima with pre-incident evidence; sample business owners validate bookings near the cutoff.
+### Restore Procedure
 
-Exact SQL must be reviewed against the restored schema and run read-only first. Do not paste broad destructive SQL into this runbook.
+```bash
+# 1. Create new database (or drop existing)
+createdb $RESTORE_DATABASE_URL
+
+# 2. Restore from dump
+pg_restore --clean --if-exists $RESTORE_DATABASE_URL < backup_*.dump
+
+# 3. Verify row counts
+psql $RESTORE_DATABASE_URL -c "SELECT COUNT(*) FROM \"Booking\";"
+psql $RESTORE_DATABASE_URL -c "SELECT COUNT(*) FROM \"Branch\";"
+psql $RESTORE_DATABASE_URL -c "SELECT COUNT(*) FROM \"Room\";"
+
+# 4. Run application migrations (if needed)
+npm --prefix next-app exec -- prisma migrate deploy
+
+# 5. Update DATABASE_URL to point to restored database
+# 6. Restart application
+```
+
+### Restore Testing
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| Restore rehearsal performed | ⬜ Chưa diễn tập | Chưa có bằng chứng |
+| RPO (Recovery Point Objective) | ⬜ Cần xác nhận | Chưa có bằng chứng |
+| RTO (Recovery Time Objective) | ⬜ Cần xác nhận | Chưa có bằng chứng |
 
 ## Rollback
 
-If the restored target fails integrity or readiness, keep maintenance on, revert Render to the prior known-compatible database URL/config version, and revalidate. Credential rollback must not re-enable a credential known to be exposed. Escalate rather than attempting a second unreviewed restore.
+### Application Rollback
+
+1. **Identify bad deploy**: Check Render dashboard for failed health checks
+2. **Rollback**: Click "Rollback" on previous successful deploy
+3. **Verify**: Health check returns 200 within 60 seconds
+4. **Monitor**: Watch error rates for 15 minutes
+
+### Database Rollback
+
+> ⚠️ Database rollback is DESTRUCTIVE. Only perform if data corruption is confirmed.
+
+1. **Stop application** (prevent new writes)
+2. **Restore from backup** (see Restore procedure)
+3. **Verify data integrity**
+4. **Update DATABASE_URL**
+5. **Restart application**
+
+### Rollback Testing
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| Application rollback tested | ⬜ Chưa diễn tập | Chưa có bằng chứng |
+| Database rollback tested | ⬜ Chưa diễn tập | Chưa có bằng chứng |
+
+## Monitoring & Alerts
+
+### Required Alerts
+
+| Alert | Threshold | Destination | Status |
+|-------|-----------|-------------|--------|
+| Health check failure | 2 consecutive failures | ⬜ Cần cấu hình | Chưa có |
+| Error rate > 5% | 5 minutes | ⬜ Cần cấu hình | Chưa có |
+| Response time p95 > 2s | 5 minutes | ⬜ Cần cấu hình | Chưa có |
+| DB connection pool > 80% | 5 minutes | ⬜ Cần cấu hình | Chưa có |
+| Disk usage > 80% | 1 hour | ⬜ Cần cấu hình | Chưa có |
+
+### Log Drain
+
+| Destination | Status | Evidence |
+|-------------|--------|----------|
+| External log aggregation | ⬜ Cần cấu hình | Chưa có bằng chứng |
+| Error tracking (Sentry/etc) | ⬜ Cần cấu hình | Chưa có bằng chứng |
+| Uptime monitoring | ⬜ Cần cấu hình | Chưa có bằng chứng |
+
+## Incident Response
+
+### Severity Levels
+
+| Level | Description | Response Time |
+|-------|-------------|---------------|
+| P0 | Complete outage | 15 minutes |
+| P1 | Major feature broken | 30 minutes |
+| P2 | Minor feature broken | 2 hours |
+| P3 | Cosmetic issue | 1 business day |
+
+### Contact
+
+| Role | Name | Contact |
+|------|------|---------|
+| On-call engineer | | ⬜ Cần cung cấp |
+| Business owner | | ⬜ Cần cung cấp |
+| Infrastructure | | ⬜ Cần cung cấp |
