@@ -56,6 +56,9 @@ export function resolvePaymentWebhookTransition(
     if (requested === "refunded") return { status: "refunded", replayed: false }
     throw new Error("INVALID_PAYMENT_TRANSITION")
   }
+  if (current === "failed" || current === "expired") {
+    throw new Error("INVALID_PAYMENT_TRANSITION")
+  }
   if (requested === "refunded") throw new Error("INVALID_PAYMENT_TRANSITION")
 
   return { status: requested, replayed: false }

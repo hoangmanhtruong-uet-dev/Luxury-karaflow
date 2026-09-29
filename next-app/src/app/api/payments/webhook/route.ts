@@ -63,7 +63,16 @@ export async function POST(request: Request) {
     })
     if (!payment || payment.bookingId !== event.data.bookingId)
       return { ok: false as const, code: "PAYMENT_NOT_FOUND" }
-    if (payment.lastWebhookId === event.data.eventId)
+
+    const existingEvent = await tx.paymentEventLedger.findUnique({
+      where: {
+        provider_eventId: {
+          provider: payment.provider ?? "default",
+          eventId: event.data.eventId,
+        },
+      },
+    })
+    if (existingEvent)
       return { ok: true as const, replayed: true }
 
     if (event.data.status === "paid") {
@@ -100,6 +109,19 @@ export async function POST(request: Request) {
             : payment.paidAt,
       },
     })
+
+    await tx.paymentEventLedger.create({
+      data: {
+        provider: payment.provider ?? "default",
+        eventId: event.data.eventId,
+        paymentId: payment.id,
+        bookingId: event.data.bookingId,
+        status: event.data.status,
+        amount: event.data.amount,
+        providerPaymentId: event.data.providerPaymentId,
+      },
+    })
+
     await tx.auditLog.create({
       data: {
         actorRole: "payment-provider",

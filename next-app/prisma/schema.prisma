@@ -405,6 +405,22 @@ model Payment {
   @@unique([provider, providerPaymentId])
 }
 
+model PaymentEventLedger {
+  id                String   @id @default(uuid())
+  provider          String   @db.VarChar(40)
+  eventId           String   @db.VarChar(180)
+  paymentId         String
+  bookingId         String
+  status            String   @db.VarChar(20)
+  amount            Int
+  providerPaymentId String   @db.VarChar(180)
+  processedAt       DateTime @default(now()) @db.Timestamptz(3)
+  createdAt         DateTime @default(now())
+
+  @@unique([provider, eventId])
+  @@index([paymentId])
+}
+
 model PricingRule {
   id String @id @default(uuid())
   name String @db.VarChar(120)
