@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { MenuIcon, Phone } from "lucide-react"
+import { MenuIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { brand, contactInfo, navItems } from "@/data/site"
+import { brand, navItems } from "@/data/site"
 import MobileNav from "./MobileNav"
 
 export default function Header() {

@@ -3,7 +3,7 @@
 import { motion } from "framer-motion"
 import Link from "next/link"
 import Image from "next/image"
-import { ChevronRight, Lock, Sliders, ShieldCheck, Heart } from "lucide-react"
+import { Lock, Sliders, ShieldCheck, Heart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const stats = [
