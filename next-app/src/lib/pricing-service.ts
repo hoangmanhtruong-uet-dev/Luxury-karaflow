@@ -27,9 +27,16 @@ export function assertNoEqualPriorityOverlap(candidate: PricingRuleInput, existi
     if (candidate.roomTier && rule.roomTier && candidate.roomTier !== rule.roomTier) continue
     if (candidate.specificDate && rule.specificDate && candidate.specificDate !== rule.specificDate) continue
     if (candidate.dayOfWeek != null && rule.dayOfWeek != null && candidate.dayOfWeek !== rule.dayOfWeek) continue
-    const startsBeforeEnd = candidate.validFrom <= (rule.validTo ?? candidate.validFrom)
-    const endsAfterStart = (candidate.validTo ?? rule.validTo ?? candidate.validFrom) >= rule.validFrom
-    if (startsBeforeEnd && endsAfterStart && candidate.startMinute < rule.endMinute && rule.startMinute < candidate.endMinute) throw new Error("Equal-priority pricing rules overlap")
+
+    const candidateStart = candidate.validFrom
+    const candidateEnd = candidate.validTo ?? "9999-12-31"
+    const ruleStart = rule.validFrom
+    const ruleEnd = rule.validTo ?? "9999-12-31"
+
+    const dateOverlap = candidateStart <= ruleEnd && candidateEnd >= ruleStart
+    const timeOverlap = candidate.startMinute < rule.endMinute && rule.startMinute < candidate.endMinute
+
+    if (dateOverlap && timeOverlap) throw new Error("Equal-priority pricing rules overlap")
   }
 }
 function matches(rule: PricingRuleInput, room: PricingRoom, at: Date) {
