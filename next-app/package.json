@@ -30,7 +30,9 @@
     "test:integration:ci": "tsx scripts/run-integration-tests.ts --suite-only",
     "test:db:guard": "tsx scripts/check-test-database.ts",
     "test:db:reset:ci": "tsx scripts/reset-ci-test-database.ts",
-    "test:db:metadata": "tsx scripts/verify-test-database-metadata.ts"
+    "test:db:metadata": "tsx scripts/verify-test-database-metadata.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.0",
@@ -73,6 +75,7 @@
     "prisma": "^7.9.1",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.22.4",
+    "@playwright/test": "^1.49.0",
     "typescript": "^5",
     "vitest": "^4.1.10"
   },
